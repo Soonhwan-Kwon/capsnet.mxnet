@@ -1,23 +1,24 @@
 import mxnet as mx
 import numpy as np
+# data.shape = [batch_size, 1, 28, 28]
 data = mx.sym.Variable('data')
 
 conv1_num_filter = 256
 kernel = (9, 9)
-batch_size = 48
+batch_size = 1
 epsilon = 1e-08
 input_shape =(1, 28, 28)
 #Conv2D layer
 # net.shape = [batch_size, 256, 20, 20]
-net = mx.sym.Reshape(data=data, shape=(-4, -1, 1, 0, 0))
-net.infer_shape(data=(batch_size, 28, 28))
-net = mx.sym.Convolution(data=net,
+#net = mx.sym.Reshape(data=data, shape=(0., -4, -1, 1, 0, 0))
+#print('after reshape', net.infer_shape(data=(batch_size, 28, 28)))
+net = mx.sym.Convolution(data=data,
                          num_filter=conv1_num_filter,
                          kernel=kernel,
                          layout='NCHW',
                          name='conv1')
 net = mx.sym.Activation(data=net, act_type='relu', name='conv1_act')
-net.infer_shape(data=(batch_size, 28, 28))
+print('after conv2d',net.infer_shape(data=(batch_size, 1, 28, 28)))
 # net.shape = [batch_size, 256, 6, 6]
 dim_vector = 8
 n_channels = 32
@@ -28,7 +29,7 @@ net = mx.sym.Convolution(data=net,
                          stride=[2, 2],
                          name='conv2_primarycap'
                          )
-net.infer_shape(data=(batch_size, 28, 28))
+print('after conv2d 2',net.infer_shape(data=(batch_size, 1, 28, 28)))
 # net.shape = [batch_size, 1152,8]
 net = mx.sym.Reshape(data=net, shape=(0, -1, dim_vector))
 
@@ -40,7 +41,8 @@ def squash(net, name=''):
     return squashed_net
 
 net = squash(net)
-net.infer_shape(data=(batch_size, 28, 28))
+net.infer_shape(data=(batch_size, 1, 28, 28))
+print('after squash', net.infer_shape(data=(batch_size, 1, 28, 28)))
 # CapsuleLayer
 
 # int_num_capsule = n_class
@@ -82,18 +84,18 @@ bias = mx.sym.Variable('Bias',
 # ('inputs_expand', TensorShape([Dimension(None), Dimension(1152), Dimension(1), Dimension(8), Dimension(1)]))
 net = mx.sym.Reshape(data=net, shape=(0, 0, -4, -1, 1))
 net = mx.sym.Reshape(data=net, shape=(0, 0, -4, 1, -1, 0))
-net.infer_shape(data=(batch_size, 28, 28))
+print('after inputs_expand', net.infer_shape(data=(batch_size, 1, 28, 28)))
 # input_tiled
 # ('inputs_tiled.shape', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(8), Dimension(1)]))
 net = mx.sym.tile(data=net, reps=(1, 1, n_class, 1, 1))
-net.infer_shape(data=(batch_size, 28, 28))
+net.infer_shape(data=(batch_size, 1, 28, 28))
 # w_tiled
 # w_tiled.shape = [(1L, 1152L, 10L, 8L, 16L)]
 w_tiled = mx.sym.tile(w, reps=(batch_size, 1, 1, 1, 1))
 w_tiled.infer_shape()
-inputs_hat = mx.sym.linalg_gemm(w_tiled, net, transpose_a=True)
+inputs_hat = mx.sym.linalg_gemm2(w_tiled, net, transpose_a=True)
 inputs_hat = mx.sym.swapaxes(data=inputs_hat, dim1=3, dim2=4)
-inputs_hat.infer_shape(data=(batch_size, 28, 28))
+inputs_hat.infer_shape(data=(batch_size, 1, 28, 28))
 # ('i', 0, 'c', TensorShape([Dimension(1), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
 
 for i in range(0, num_routing):
@@ -106,7 +108,7 @@ for i in range(0, num_routing):
 
 # ('digitcaps', TensorShape([Dimension(None), Dimension(10), Dimension(16)]))
 digitcaps = mx.sym.Reshape(data=outputs, shape=(-1, num_capsule, dim_vector))
-digitcaps.infer_shape(data=(batch_size, 28, 28))
+digitcaps.infer_shape(data=(batch_size, 1, 28, 28))
 # ('i', 0, 'outputs', TensorShape([Dimension(None), Dimension(1), Dimension(10), Dimension(1), Dimension(16)]))
 # ('bias', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
 # ('i', 1, 'c', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
@@ -119,20 +121,20 @@ digitcaps.infer_shape(data=(batch_size, 28, 28))
 # ('inputs_masked', TensorShape([Dimension(None), Dimension(16)]))
 
 out_caps = mx.sym.sqrt(data=mx.sym.sum(digitcaps, 2))
-out_caps.infer_shape(data=(batch_size, 28, 28))
+out_caps.infer_shape(data=(batch_size, 1, 28, 28))
 y = mx.sym.Variable('softmax_label', shape=(batch_size))
 y = mx.sym.one_hot(y, n_class)
 y = mx.sym.Reshape(data=y, shape=(batch_size, -4, n_class, -1))
 y.infer_shape(softmax_label=(batch_size))
 #inputs_masked = mx.sym.batch_dot(mx.sym.transpose(y), digitcaps)
-inputs_masked = mx.sym.linalg_gemm(y, digitcaps, transpose_a=True)
+inputs_masked = mx.sym.linalg_gemm2(y, digitcaps, transpose_a=True)
 #inputs_masked = mx.sym.linalg_gemm(mx.sym.transpose(y), digitcaps, transpose_a=True)
 # y.infer_shape(y=(1,10))
 # inputs_masked = mx.sym.linalg_gemm(out_caps, y, transpose_a=True)
 #inputs_masked = mx.sym.batch_dot(out_caps, y)
-print(inputs_masked.infer_shape(data=(batch_size, 28, 28), softmax_label=(batch_size)))
+print(inputs_masked.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size)))
 inputs_masked = mx.sym.Reshape(data=inputs_masked, shape=(-3, 0))
-print(inputs_masked.infer_shape(data=(batch_size, 28, 28), softmax_label=(batch_size)))
+print(inputs_masked.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size)))
 x_recon = mx.sym.FullyConnected(data=inputs_masked, num_hidden=512, name='x_recon')
 x_recon = mx.sym.Activation(data=x_recon, act_type='relu', name='x_recon_act')
 x_recon = mx.sym.FullyConnected(data=x_recon, num_hidden=1024, name='x_recon2')
@@ -140,7 +142,7 @@ x_recon = mx.sym.Activation(data=x_recon, act_type='relu', name='x_recon_act2')
 
 x_recon = mx.sym.FullyConnected(data=x_recon, num_hidden=np.prod(input_shape), name='x_recon3')
 x_recon = mx.sym.Activation(data=x_recon, act_type='relu', name='x_recon_act3')
-print(x_recon.infer_shape(data=(batch_size, 28, 28), softmax_label=(batch_size)))
+print(x_recon.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size)))
 def margin_loss(y_true, y_pred):
     L = y_true * mx.sym.square(mx.sym.maximum(0., 0.9 - y_pred)) + \
         0.5 * (1 - y_true) * mx.sym.square(mx.sym.maximum(0., y_pred - 0.1))
@@ -148,7 +150,9 @@ def margin_loss(y_true, y_pred):
 
 data_flatten = mx.sym.flatten(data=data)
 loss = mx.symbol.MakeLoss(margin_loss(data_flatten, x_recon))
-final_net = mx.sym.Group([out_caps, loss])
+out_caps_blocked = out_caps
+out_caps_blocked = mx.sym.BlockGrad(out_caps_blocked)
+final_net = mx.sym.Group([out_caps_blocked, loss])
 # get mnist data set
 
 import numpy as np
@@ -190,8 +194,10 @@ class LossMetric(mx.metric.EvalMetric):
         self.num_gpu = num_gpu
     def update(self, labels, preds):
         self.batch_loss = 0.
-        print(labels)
-        print(preds)
+        for label, pred in zip(labels[0],preds[0]):
+            print(label.asnumpy())
+            print(pred.asnumpy())
+
     def get_batch_loss(self):
         return self.batch_loss
     def get_name_value(self):
@@ -205,7 +211,7 @@ class LossMetric(mx.metric.EvalMetric):
         self.total_ctc_loss = 0.0
 
 loss_metric =LossMetric(batch_size, 1)
-mlp_model = mx.mod.Module(symbol=final_net, context=mx.gpu(0), data_names=('data',), label_names=('softmax_label',))
+mlp_model = mx.mod.Module(symbol=final_net, context=mx.cpu(), data_names=('data',), label_names=('softmax_label',))
 mlp_model.fit(train_iter,  # train data
               eval_data=val_iter,  # validation data
               optimizer='adam',  # use SGD to train
