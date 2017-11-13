@@ -121,6 +121,7 @@ digitcaps.infer_shape(data=(batch_size, 1, 28, 28))
 # ('inputs_masked', TensorShape([Dimension(None), Dimension(16)]))
 
 out_caps = mx.sym.sqrt(data=mx.sym.sum(mx.sym.square(digitcaps), 2))
+out_caps = mx.sym.softmax(data=out_caps, axis=1)
 out_caps.infer_shape(data=(batch_size, 1, 28, 28))
 y = mx.sym.Variable('softmax_label', shape=(batch_size,))
 y = mx.sym.one_hot(y, n_class)
@@ -142,14 +143,18 @@ x_recon = mx.sym.Activation(data=x_recon, act_type='relu', name='x_recon_act2')
 
 x_recon = mx.sym.FullyConnected(data=x_recon, num_hidden=np.prod(input_shape), name='x_recon3')
 x_recon = mx.sym.Activation(data=x_recon, act_type='sigmoid', name='x_recon_act3')
-print(x_recon.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size,)))
+print('x_recon',x_recon.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size,)))
 def margin_loss(y_true, y_pred):
     L = y_true * mx.sym.square(mx.sym.maximum(0., 0.9 - y_pred)) + \
         0.5 * (1 - y_true) * mx.sym.square(mx.sym.maximum(0., y_pred - 0.1))
     return mx.sym.mean(data=mx.sym.sum(L, 1))
 
 data_flatten = mx.sym.flatten(data=data)
-loss = mx.symbol.MakeLoss(margin_loss(data_flatten, x_recon))
+squared_error = mx.sym.square(x_recon-data_flatten)
+recon_error = mx.sym.mean(squared_error)
+print('squared_error',squared_error.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size,)))
+loss = mx.symbol.MakeLoss(margin_loss(data_flatten, x_recon)+0.392*recon_error)
+
 #
 
 # primarycaps_blocked = primarycaps
@@ -239,7 +244,7 @@ loss_metric =LossMetric(batch_size, 1)
 mlp_model = mx.mod.Module(symbol=final_net, context=mx.gpu(0), data_names=('data',), label_names=('softmax_label',))
 mlp_model.fit(train_iter,  # train data
               eval_data=val_iter,  # validation data
-              optimizer='adam',  # use SGD to train
+              optimizer='adam',  # use adam to train
               optimizer_params={'learning_rate': 0.001},  # use fixed learning rate
               eval_metric=loss_metric,  # report accuracy during training
               num_epoch=40)  # train for at most 10 dataset passes
