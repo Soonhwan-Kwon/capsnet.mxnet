@@ -223,25 +223,21 @@ class LossMetric(mx.metric.EvalMetric):
         super(LossMetric, self).__init__('LossMetric')
         self.batch_size = batch_size
         self.num_gpu = num_gpu
+        self.hit_count = 0
+        self.count = 0
     def update(self, labels, preds):
-        self.batch_loss = 0.
-        # for label, pred_primarycaps, pred_softmax, pred_recon in zip(labels[0], preds[0], preds[1], preds[2]):
-        for label, pred_primarycaps, pred_recon in zip(labels[0], preds[0], preds[1]):
-            print(label.asnumpy())
-            print(pred_primarycaps.shape, pred_primarycaps.asnumpy())
-            # print(pred_softmax.asnumpy())
-            print(pred_recon.shape, pred_recon.asnumpy())
-    def get_batch_loss(self):
-        return self.batch_loss
+        for label, pred_outcaps, pred_loss in zip(labels[0], preds[0], preds[1]):
+            label_np = int(label.asnumpy())
+            pred_label = int(np.argmax(pred_outcaps.asnumpy()))
+            self.hit_count += int(label_np == pred_label)
+            self.count += 1
+            print('label:'+str(label_np)+', pred:'+str(pred_label)+', hit:'+str(label_np == pred_label)+', loss:'+str(pred_loss.asnumpy())+', hit_ratio:'+str(float(self.hit_count)/float(self.count)))
     def reset(self):
-        self.total_n_label = 0
-        self.total_l_dist = 0
-        self.num_inst = 0
-        self.sum_metric = 0.0
-        self.total_ctc_loss = 0.0
+        self.hit_count = 0
+        self.count = 0
 
 loss_metric =LossMetric(batch_size, 1)
-mlp_model = mx.mod.Module(symbol=final_net, context=mx.gpu(0), data_names=('data',), label_names=('softmax_label',))
+mlp_model = mx.mod.Module(symbol=final_net, context=[mx.gpu(0)], data_names=('data',), label_names=('softmax_label',))
 mlp_model.fit(train_iter,  # train data
               eval_data=val_iter,  # validation data
               optimizer='adam',  # use adam to train
