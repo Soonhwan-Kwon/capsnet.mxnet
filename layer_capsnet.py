@@ -223,18 +223,19 @@ class LossMetric(mx.metric.EvalMetric):
         super(LossMetric, self).__init__('LossMetric')
         self.batch_size = batch_size
         self.num_gpu = num_gpu
-        self.hit_count = 0
-        self.count = 0
+        self.sum_metric = 0
+        self.num_inst = 0
     def update(self, labels, preds):
         for label, pred_outcaps, pred_loss in zip(labels[0], preds[0], preds[1]):
             label_np = int(label.asnumpy())
             pred_label = int(np.argmax(pred_outcaps.asnumpy()))
-            self.hit_count += int(label_np == pred_label)
-            self.count += 1
-            print('label:'+str(label_np)+', pred:'+str(pred_label)+', hit:'+str(label_np == pred_label)+', loss:'+str(pred_loss.asnumpy())+', hit_ratio:'+str(float(self.hit_count)/float(self.count)))
+            self.sum_metric += int(label_np == pred_label)
+            self.num_inst += 1
+            print('label:'+str(label_np)+', pred:'+str(pred_label)+', hit:'+str(label_np == pred_label)+', loss:'+str(pred_loss.asnumpy())+', hit_ratio:'+str(float(self.sum_metric)/float(self.num_inst)))
     def reset(self):
-        self.hit_count = 0
-        self.count = 0
+        print('LossMetric reset')
+        self.sum_metric = 0
+        self.num_inst = 0
 
 loss_metric =LossMetric(batch_size, 1)
 mlp_model = mx.mod.Module(symbol=final_net, context=[mx.gpu(0)], data_names=('data',), label_names=('softmax_label',))
