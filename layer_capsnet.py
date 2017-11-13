@@ -208,7 +208,7 @@ class LossMetric(mx.metric.EvalMetric):
         self.total_ctc_loss = 0.0
 
 loss_metric =LossMetric(batch_size, 1)
-mlp_model = mx.mod.Module(symbol=final_net, context=mx.cpu(), data_names=('data',), label_names=('softmax_label',))
+mlp_model = mx.mod.Module(symbol=final_net, context=mx.gpu(0), data_names=('data',), label_names=('softmax_label',))
 mlp_model.fit(train_iter,  # train data
               eval_data=val_iter,  # validation data
               optimizer='adam',  # use SGD to train
