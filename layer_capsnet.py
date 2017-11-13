@@ -95,7 +95,7 @@ w_tiled = mx.sym.tile(w, reps=(batch_size, 1, 1, 1, 1))
 w_tiled.infer_shape()
 inputs_hat = mx.sym.linalg_gemm2(w_tiled, inputs_tiled, transpose_a=True)
 inputs_hat = mx.sym.swapaxes(data=inputs_hat, dim1=3, dim2=4)
-inputs_hat.infer_shape(data=(batch_size, 1, 28, 28))
+print('inputs_hat',inputs_hat.infer_shape(data=(batch_size, 1, 28, 28)))
 # ('i', 0, 'c', TensorShape([Dimension(1), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
 
 for i in range(0, num_routing):
@@ -120,7 +120,7 @@ digitcaps.infer_shape(data=(batch_size, 1, 28, 28))
 # ('out_caps', TensorShape([Dimension(None), Dimension(10)]))
 # ('inputs_masked', TensorShape([Dimension(None), Dimension(16)]))
 
-out_caps = mx.sym.sqrt(data=mx.sym.sum(digitcaps, 2))
+out_caps = mx.sym.sqrt(data=mx.sym.sum(mx.sym.square(digitcaps), 2))
 out_caps.infer_shape(data=(batch_size, 1, 28, 28))
 y = mx.sym.Variable('softmax_label', shape=(batch_size,))
 y = mx.sym.one_hot(y, n_class)
@@ -150,9 +150,35 @@ def margin_loss(y_true, y_pred):
 
 data_flatten = mx.sym.flatten(data=data)
 loss = mx.symbol.MakeLoss(margin_loss(data_flatten, x_recon))
+#
+
+# primarycaps_blocked = primarycaps
+# primarycaps_blocked = mx.sym.BlockGrad(primarycaps_blocked)
+# final_net = mx.sym.Group([primarycaps_blocked, loss])
+# digitcaps_blocked = digitcaps
+# digitcaps_blocked = mx.sym.BlockGrad(digitcaps_blocked)
+# final_net = mx.sym.Group([digitcaps_blocked, loss])
 out_caps_blocked = out_caps
 out_caps_blocked = mx.sym.BlockGrad(out_caps_blocked)
 final_net = mx.sym.Group([out_caps_blocked, loss])
+# sym=loss
+# input_desc = data_iter.provide_data + data_iter.provide_label
+# input_names = [k for k, shape in input_desc]
+# input_buffs = [mx.nd.empty(shape, ctx=xpu) for k, shape in input_desc]
+# args = dict(args, **dict(zip(input_names, input_buffs)))
+# output_names = loss.list_outputs()
+# if debug:
+#     sym = sym.get_internals()
+#     blob_names = sym.list_outputs()
+#     sym_group = []
+#     for i in range(len(blob_names)):
+#         if blob_names[i] not in args:
+#             x = sym[i]
+#             if blob_names[i] not in output_names:
+#                 x = mx.symbol.BlockGrad(x, name=blob_names[i])
+#             sym_group.append(x)
+#     sym = mx.symbol.Group(sym_group)
+# final_net = sym
 # get mnist data set
 
 import numpy as np
@@ -194,10 +220,12 @@ class LossMetric(mx.metric.EvalMetric):
         self.num_gpu = num_gpu
     def update(self, labels, preds):
         self.batch_loss = 0.
-        for label, pred_softmax, pred_recon in zip(labels[0], preds[0], preds[1]):
+        # for label, pred_primarycaps, pred_softmax, pred_recon in zip(labels[0], preds[0], preds[1], preds[2]):
+        for label, pred_primarycaps, pred_recon in zip(labels[0], preds[0], preds[1]):
             print(label.asnumpy())
-            print(pred_softmax.asnumpy())
-            print(pred_recon.asnumpy())
+            print(pred_primarycaps.shape, pred_primarycaps.asnumpy())
+            # print(pred_softmax.asnumpy())
+            print(pred_recon.shape, pred_recon.asnumpy())
     def get_batch_loss(self):
         return self.batch_loss
     def reset(self):
