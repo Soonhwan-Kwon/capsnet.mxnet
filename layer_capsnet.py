@@ -243,4 +243,5 @@ mlp_model.fit(train_iter,  # train data
               optimizer='adam',  # use adam to train
               optimizer_params={'learning_rate': 0.001},  # use fixed learning rate
               eval_metric=loss_metric,  # report accuracy during training
-              num_epoch=40)  # train for at most 10 dataset passes
+              num_epoch=40,
+              epoch_end_callback=mx.callback.do_checkpoint('capsnet'))  # train for at most 10 dataset passes
