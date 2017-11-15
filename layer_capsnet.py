@@ -121,7 +121,6 @@ digitcaps.infer_shape(data=(batch_size, 1, 28, 28))
 # ('inputs_masked', TensorShape([Dimension(None), Dimension(16)]))
 
 out_caps = mx.sym.sqrt(data=mx.sym.sum(mx.sym.square(digitcaps), 2))
-out_caps = mx.sym.softmax(data=out_caps, axis=1)
 out_caps.infer_shape(data=(batch_size, 1, 28, 28))
 y = mx.sym.Variable('softmax_label', shape=(batch_size,))
 y_onehot= mx.sym.one_hot(y, n_class)
