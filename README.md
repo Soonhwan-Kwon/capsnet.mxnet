@@ -1,9 +1,11 @@
 **deepSpeech.mxnet: Rich Speech Example**
 =========================================
 
-This example is MXNet implementation of [CapsNet](https://arxiv.org/abs/1710.09829)
-- The Current best test error is 0.5%
+This example is MXNet implementation of [CapsNet](https://arxiv.org/abs/1710.09829):  
+Sara Sabour, Nicholas Frosst, Geoffrey E Hinton. Dynamic Routing Between Capsules. NIPS 2017
+- The Current best test error is 0.5%  
 
+Due to the permission issue, this example is maintained in this [repository](https://github.com/samsungsds-rnd/capsnet.mxnet) separately.
 * * *
 ## **Usage**
 On Single gpu
@@ -21,7 +23,8 @@ python capsulenet.py --devices gpu0,gpu1
 MXNet version above (0.11.0)
 
 ***
-## **Results**
+## **Results**  
+CapsNet classification test error on MNIST
 
 | Epoch | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
