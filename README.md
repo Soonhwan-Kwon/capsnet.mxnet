@@ -2,7 +2,7 @@
 MXNet implementation of CapsNet
 
 Requirement  
-MXNet 0.10.1  
+MXNet 0.11.0
 
 command  
 python layer_capsnet.py
