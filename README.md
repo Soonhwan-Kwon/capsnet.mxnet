@@ -7,13 +7,13 @@ This example is MXNet implementation of [CapsNet](https://arxiv.org/abs/1710.098
 * * *
 ## **Usage**
 On Single gpu
-'''
+```
 python capsulenet.py --devices gpu0
-'''
+```
 On Multi gpus
-'''
+```
 python capsulenet.py --devices gpu0,gpu1
-'''
+```
 
 * * *
 ## **Prerequisities**
