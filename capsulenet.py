@@ -1,7 +1,7 @@
 import mxnet as mx
 import numpy as np
 import os
-import sys
+import re
 import urllib
 import gzip
 import struct
@@ -34,7 +34,7 @@ def capsnet(batch_size, n_class, num_routing):
     primarycaps = PrimaryCaps(data=conv1,
                               dim_vector=8,
                               n_channels=32,
-                              kernel_size=(9,9),
+                              kernel=(9, 9),
                               strides=[2,2],
                               name='primarycaps')
     primarycaps.infer_shape(data=(batch_size, 1, 28, 28))
@@ -227,24 +227,39 @@ if __name__ == "__main__":
     # set batch size
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', default=100, type=int)
+    parser.add_argument('--batch_size', default=10, type=int)
+    parser.add_argument('--devices', default='gpu0', type=str)
+    parser.add_argument('--num_epoch', default=30, type=int)
+    parser.add_argument('--lr', default=0.0001, type=float)
+    parser.add_argument('--num_routing', default=3, type=int)
     args = parser.parse_args()
+    contexts = re.split(r'\W+', args.devices)
+    for i, ctx in enumerate(contexts):
+        if ctx[:3] == 'gpu':
+            contexts[i] = mx.context.gpu(int(ctx[3:]))
+        else:
+            contexts[i] = mx.context.cpu()
+    num_gpu = len(contexts)
+
+    if args.batch_size % num_gpu != 0:
+        raise Exception('num_gpu should be positive divisor of batch_size')
+
 
     # generate train_iter, val_iter
     train_iter = mx.io.NDArrayIter(data=to4d(train_img), label=train_lbl, batch_size=args.batch_size, shuffle=True)
     val_iter = mx.io.NDArrayIter(data=to4d(val_img), label=val_lbl, batch_size=args.batch_size,)
 
     # define capsnet
-    final_net = capsnet(batch_size=args.batch_size, n_class=10, num_routing=3)
+    final_net = capsnet(batch_size=args.batch_size/num_gpu, n_class=10, num_routing=args.num_routing)
 
     # set metric
-    loss_metric = LossMetric(args.batch_size, 1)
+    loss_metric = LossMetric(args.batch_size/num_gpu, 1)
 
     # run model
-    module = mx.mod.Module(symbol=final_net, context=[mx.gpu(0)], data_names=('data',), label_names=('softmax_label',))
+    module = mx.mod.Module(symbol=final_net, context=contexts, data_names=('data',), label_names=('softmax_label',))
     module.bind(data_shapes=train_iter.provide_data,
                 label_shapes=val_iter.provide_label,
                 for_training=True)
-    do_training(num_epoch=40, optimizer='adam', kvstore='device', learning_rate=0.0001)
+    do_training(num_epoch=args.num_epoch, optimizer='adam', kvstore='device', learning_rate=args.lr)
 
 

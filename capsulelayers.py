@@ -9,19 +9,19 @@ def squash(data, squash_axis, name=''):
     return squashed_net
 
 
-def PrimaryCaps(data, dim_vector, n_channels, kernel_size, strides, name=''):
+def PrimaryCaps(data, dim_vector, n_channels, kernel, strides, name=''):
     """
-    :param data: 4D tensor of shape [batch_size, width, height, channels]
+    :param data: 4D symbol of shape [batch_size, width, height, channels]
     :param dim_vector:
     :param n_channels:
-    :param kernel_size:
+    :param kernel:
     :param strides:
     :param name:
     :return: 3D tensor of shape [batch_size, num_capsule, dim_vector]
     """
     out = mx.sym.Convolution(data=data,
                              num_filter=dim_vector * n_channels,
-                             kernel=kernel_size,
+                             kernel=kernel,
                              stride=strides,
                              name=name
                              )
@@ -34,7 +34,7 @@ def PrimaryCaps(data, dim_vector, n_channels, kernel_size, strides, name=''):
     return out
 
 
-class CapsuleLayer():
+class CapsuleLayer:
     """
     The capsule layer with dynamic routing.
     [batch_size, input_num_capsule, input_dim_vector] => [batch_size, num_capsule, dim_vector]
@@ -53,8 +53,8 @@ class CapsuleLayer():
         _, input_num_capsule, input_dim_vector = out_shapes[0]
 
         # build w and bias
-        # ('W', TensorShape([Dimension(1152), Dimension(10), Dimension(8), Dimension(16)]))
-        # ('B', TensorShape([Dimension(1), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
+        # W : (1152, 10, 8, 16)
+        # bias : (batch_size, 1152, 10 ,1, 1)
         w = mx.sym.Variable('Weight',
                             shape=(1, input_num_capsule, self.num_capsule, input_dim_vector, self.dim_vector),
                             init=self.kernel_initializer)
