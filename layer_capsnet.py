@@ -124,11 +124,11 @@ out_caps = mx.sym.sqrt(data=mx.sym.sum(mx.sym.square(digitcaps), 2))
 out_caps = mx.sym.softmax(data=out_caps, axis=1)
 out_caps.infer_shape(data=(batch_size, 1, 28, 28))
 y = mx.sym.Variable('softmax_label', shape=(batch_size,))
-y = mx.sym.one_hot(y, n_class)
-y = mx.sym.Reshape(data=y, shape=(batch_size, -4, n_class, -1))
-y.infer_shape(softmax_label=(batch_size,))
+y_onehot= mx.sym.one_hot(y, n_class)
+y_reshaped = mx.sym.Reshape(data=y_onehot, shape=(batch_size, -4, n_class, -1))
+y_reshaped.infer_shape(softmax_label=(batch_size,))
 #inputs_masked = mx.sym.batch_dot(mx.sym.transpose(y), digitcaps)
-inputs_masked = mx.sym.linalg_gemm2(y, digitcaps, transpose_a=True)
+inputs_masked = mx.sym.linalg_gemm2(y_reshaped, digitcaps, transpose_a=True)
 #inputs_masked = mx.sym.linalg_gemm(mx.sym.transpose(y), digitcaps, transpose_a=True)
 # y.infer_shape(y=(1,10))
 # inputs_masked = mx.sym.linalg_gemm(out_caps, y, transpose_a=True)
@@ -145,16 +145,15 @@ x_recon = mx.sym.FullyConnected(data=x_recon, num_hidden=np.prod(input_shape), n
 x_recon = mx.sym.Activation(data=x_recon, act_type='sigmoid', name='x_recon_act3')
 print('x_recon',x_recon.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size,)))
 def margin_loss(y_true, y_pred):
-    L = y_true * mx.sym.square(mx.sym.maximum(0., 0.9 - y_pred)) + \
-        0.5 * (1 - y_true) * mx.sym.square(mx.sym.maximum(0., y_pred - 0.1))
+    L = y_true * mx.sym.square(mx.sym.maximum(0., 0.9 - y_pred)) + 0.5 * (1 - y_true) * mx.sym.square(mx.sym.maximum(0., y_pred - 0.1))
     return mx.sym.mean(data=mx.sym.sum(L, 1))
 
 data_flatten = mx.sym.flatten(data=data)
 squared_error = mx.sym.square(x_recon-data_flatten)
 recon_error = mx.sym.mean(squared_error)
 print('squared_error',squared_error.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size,)))
-loss = mx.symbol.MakeLoss(margin_loss(data_flatten, x_recon)+0.392*recon_error)
-
+loss = mx.symbol.MakeLoss((1-0.392)*margin_loss(y_onehot, out_caps)+0.392*recon_error)
+#loss = mx.sym.MakeLoss(margin_loss(y_onehot, out_caps))
 #
 
 # primarycaps_blocked = primarycaps
@@ -242,7 +241,7 @@ mlp_model = mx.mod.Module(symbol=final_net, context=[mx.gpu(0)], data_names=('da
 mlp_model.fit(train_iter,  # train data
               eval_data=val_iter,  # validation data
               optimizer='adam',  # use adam to train
-              optimizer_params={'learning_rate': 0.001},  # use fixed learning rate
+              optimizer_params={'learning_rate': 0.0001},  # use fixed learning rate
               eval_metric=loss_metric,  # report accuracy during training
               num_epoch=40,
-              epoch_end_callback=mx.callback.do_checkpoint('capsnet'))  # train for at most 10 dataset passes
+              epoch_end_callback=mx.callback.do_checkpoint('capsnetlr'))  # train for at most 10 dataset passes
