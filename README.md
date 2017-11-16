@@ -1,4 +1,4 @@
-**deepSpeech.mxnet: Rich Speech Example**
+**CapsNet-MXNet**
 =========================================
 
 This example is MXNet implementation of [CapsNet](https://arxiv.org/abs/1710.09829):  
