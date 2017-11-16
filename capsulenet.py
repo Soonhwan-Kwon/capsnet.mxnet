@@ -26,7 +26,8 @@ from capsulelayers import PrimaryCaps, CapsuleLayer
 
 
 def margin_loss(y_true, y_pred):
-    L = y_true * mx.sym.square(mx.sym.maximum(0., 0.9 - y_pred)) + 0.5 * (1 - y_true) * mx.sym.square(mx.sym.maximum(0., y_pred - 0.1))
+    L = y_true * mx.sym.square(mx.sym.maximum(0., 0.9 - y_pred)) +\
+        0.5 * (1 - y_true) * mx.sym.square(mx.sym.maximum(0., y_pred - 0.1))
     return mx.sym.mean(data=mx.sym.sum(L, 1))
 
 
@@ -146,7 +147,8 @@ class LossMetric(mx.metric.EvalMetric):
         return acc, mean_loss
 
     def get_batch_log(self, n_batch):
-        print("n_batch :"+str(n_batch)+" batch_acc:" + str(float(self.batch_sum_metric) / float(self.batch_num_inst)) +
+        print("n_batch :"+str(n_batch)+" batch_acc:" +
+              str(float(self.batch_sum_metric) / float(self.batch_num_inst)) +
               ' batch_loss:' + str(float(self.batch_loss)/float(self.batch_num_inst)))
         self.batch_sum_metric = 0
         self.batch_num_inst = 0
@@ -197,7 +199,7 @@ def do_training(num_epoch, optimizer, kvstore, learning_rate):
             module.update_metric(loss_metric, data_batch.label)
             loss_metric.get_batch_log(n_batch)
         val_acc, val_loss = loss_metric.get_name_value()
-        print('Epoch[' + str(n_epoch) + '] train acc:' + str(train_acc) + ' loss:' + str(train_loss) )
+        print('Epoch[' + str(n_epoch) + '] train acc:' + str(train_acc) + ' loss:' + str(train_loss))
         print('Epoch[' + str(n_epoch) + '] val acc:' + str(val_acc) + ' loss:' + str(val_loss))
         print('SAVE CHECKPOINT')
 

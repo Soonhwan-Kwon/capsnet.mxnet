@@ -20,8 +20,10 @@ import mxnet as mx
 
 def squash(data, squash_axis, name=''):
     epsilon = 1e-08
-    s_squared_norm = mx.sym.sum(data=mx.sym.square(data, name='square_'+name), axis=squash_axis, keepdims=True, name='s_squared_norm_'+name)
-    scale = s_squared_norm / (1 + s_squared_norm) / mx.sym.sqrt(data=(s_squared_norm+epsilon), name='s_squared_norm_sqrt_'+name)
+    s_squared_norm = mx.sym.sum(data=mx.sym.square(data, name='square_'+name),
+                                axis=squash_axis, keepdims=True, name='s_squared_norm_'+name)
+    scale = s_squared_norm / (1 + s_squared_norm) / mx.sym.sqrt(data=(s_squared_norm+epsilon),
+                                                                name='s_squared_norm_sqrt_'+name)
     squashed_net = mx.sym.broadcast_mul(scale, data, name='squashed_net_'+name)
     return squashed_net
 
@@ -57,8 +59,8 @@ class CapsuleLayer:
         _, input_num_capsule, input_dim_vector = out_shapes[0]
 
         # build w and bias
-        # W : (1152, 10, 8, 16)
-        # bias : (batch_size, 1152, 10 ,1, 1)
+        # W : (input_num_capsule, num_capsule, input_dim_vector, dim_vector)
+        # bias : (batch_size, input_num_capsule, num_capsule ,1, 1)
         w = mx.sym.Variable('Weight',
                             shape=(1, input_num_capsule, self.num_capsule, input_dim_vector, self.dim_vector),
                             init=self.kernel_initializer)
@@ -66,27 +68,28 @@ class CapsuleLayer:
                                shape=(self.batch_size, input_num_capsule, self.num_capsule, 1, 1),
                                init=self.bias_initializer)
 
-        # input : (batch_size, 1152, 8)
-        # inputs_expand : (batch_size, 1152, 1, 8, 1)
+        # input : (batch_size, input_num_capsule, input_dim_vector)
+        # inputs_expand : (batch_size, input_num_capsule, 1, input_dim_vector, 1)
         inputs_expand = mx.sym.Reshape(data=data, shape=(0, 0, -4, -1, 1))
         inputs_expand = mx.sym.Reshape(data=inputs_expand, shape=(0, 0, -4, 1, -1, 0))
-        # input_tiled (batch_size, 1152, 10, 8, 1)
+        # input_tiled (batch_size, input_num_capsule, num_capsule, input_dim_vector, 1)
         inputs_tiled = mx.sym.tile(data=inputs_expand, reps=(1, 1, self.num_capsule, 1, 1))
-        # w_tiled : [(1L, 1152L, 10L, 8L, 16L)]
+        # w_tiled : [(1L, input_num_capsule, num_capsule, input_dim_vector, dim_vector)]
         w_tiled = mx.sym.tile(w, reps=(self.batch_size, 1, 1, 1, 1))
 
+        # inputs_hat : [(1L, input_num_capsule, num_capsule, 1, dim_vector)]
         inputs_hat = mx.sym.linalg_gemm2(w_tiled, inputs_tiled, transpose_a=True)
         inputs_hat = mx.sym.swapaxes(data=inputs_hat, dim1=3, dim2=4)
 
         for i in range(0, self.num_routing):
             c = mx.sym.softmax(bias, axis=2, name='c' + str(i))
             outputs = squash(
-                mx.sym.sum(mx.sym.broadcast_mul(c, inputs_hat, name='broadcast_mul_' + str(i)), axis=1, keepdims=True,
+                mx.sym.sum(mx.sym.broadcast_mul(c, inputs_hat, name='broadcast_mul_' + str(i)),
+                           axis=1, keepdims=True,
                            name='sum_' + str(i)), name='output_' + str(i), squash_axis=4)
             if i != self.num_routing - 1:
                 bias = bias + mx.sym.sum(mx.sym.broadcast_mul(c, inputs_hat, name='bias_broadcast_mul' + str(i)), axis=4,
                                          keepdims=True, name='bias_' + str(i))
 
-        # digitcaps : (batch_size, 10, 16)
         outputs = mx.sym.Reshape(data=outputs, shape=(-1, self.num_capsule, self.dim_vector))
         return outputs
