@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 import mxnet as mx
 import numpy as np
 import os
@@ -20,15 +37,12 @@ def capsnet(batch_size, n_class, num_routing):
     input_shape =(1, 28, 28)
     #Conv2D layer
     # net.shape = [batch_size, 256, 20, 20]
-    #net = mx.sym.Reshape(data=data, shape=(0., -4, -1, 1, 0, 0))
-    #print('after reshape', net.infer_shape(data=(batch_size, 28, 28)))
     conv1 = mx.sym.Convolution(data=data,
                                num_filter=256,
                                kernel=(9,9),
                                layout='NCHW',
                                name='conv1')
     conv1 = mx.sym.Activation(data=conv1, act_type='relu', name='conv1_act')
-    print('after conv2d',conv1.infer_shape(data=(batch_size, 1, 28, 28)))
     # net.shape = [batch_size, 256, 6, 6]
 
     primarycaps = PrimaryCaps(data=conv1,
@@ -38,25 +52,7 @@ def capsnet(batch_size, n_class, num_routing):
                               strides=[2,2],
                               name='primarycaps')
     primarycaps.infer_shape(data=(batch_size, 1, 28, 28))
-    print('after squash', primarycaps.infer_shape(data=(batch_size, 1, 28, 28)))
     # CapsuleLayer
-
-    # int_num_capsule = n_class
-    # input_shape = [None, input_num_capsule
-    # ('primarycaps', TensorShape([Dimension(None), Dimension(1152), Dimension(8)]))
-    # ('W', TensorShape([Dimension(1152), Dimension(10), Dimension(8), Dimension(16)]))
-    # ('B', TensorShape([Dimension(1), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
-
-    # ('inputs_hat', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(1), Dimension(16)]))
-    # ('i', 0, 'c', TensorShape([Dimension(1), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
-    # ('i', 0, 'outputs', TensorShape([Dimension(None), Dimension(1), Dimension(10), Dimension(1), Dimension(16)]))
-    # ('bias', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
-    # ('i', 1, 'c', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
-    # ('i', 1, 'outputs', TensorShape([Dimension(None), Dimension(1), Dimension(10), Dimension(1), Dimension(16)]))
-    # ('bias', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
-    # ('i', 2, 'c', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
-    # ('i', 2, 'outputs', TensorShape([Dimension(None), Dimension(1), Dimension(10), Dimension(1), Dimension(16)]))
-
     kernel_initializer = mx.init.Xavier(rnd_type='uniform', factor_type='avg', magnitude=3)
     bias_initializer = mx.init.Zero()
     digitcaps = CapsuleLayer(num_capsule=10,
@@ -66,36 +62,28 @@ def capsnet(batch_size, n_class, num_routing):
                              bias_initializer=bias_initializer,
                              num_routing=num_routing)(primarycaps)
 
-    # ('out_caps', TensorShape([Dimension(None), Dimension(10)]))
-    # ('inputs_masked', TensorShape([Dimension(None), Dimension(16)]))
-
+    # out_caps : (batch_size, 10)
     out_caps = mx.sym.sqrt(data=mx.sym.sum(mx.sym.square(digitcaps), 2))
     out_caps.infer_shape(data=(batch_size, 1, 28, 28))
+
     y = mx.sym.Variable('softmax_label', shape=(batch_size,))
-    y_onehot= mx.sym.one_hot(y, n_class)
+    y_onehot = mx.sym.one_hot(y, n_class)
     y_reshaped = mx.sym.Reshape(data=y_onehot, shape=(batch_size, -4, n_class, -1))
     y_reshaped.infer_shape(softmax_label=(batch_size,))
-    #inputs_masked = mx.sym.batch_dot(mx.sym.transpose(y), digitcaps)
+
+    # inputs_masked : (batch_size, 16)
     inputs_masked = mx.sym.linalg_gemm2(y_reshaped, digitcaps, transpose_a=True)
-    #inputs_masked = mx.sym.linalg_gemm(mx.sym.transpose(y), digitcaps, transpose_a=True)
-    # y.infer_shape(y=(1,10))
-    # inputs_masked = mx.sym.linalg_gemm(out_caps, y, transpose_a=True)
-    #inputs_masked = mx.sym.batch_dot(out_caps, y)
-    print(inputs_masked.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size,)))
     inputs_masked = mx.sym.Reshape(data=inputs_masked, shape=(-3, 0))
-    print(inputs_masked.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size,)))
     x_recon = mx.sym.FullyConnected(data=inputs_masked, num_hidden=512, name='x_recon')
     x_recon = mx.sym.Activation(data=x_recon, act_type='relu', name='x_recon_act')
     x_recon = mx.sym.FullyConnected(data=x_recon, num_hidden=1024, name='x_recon2')
     x_recon = mx.sym.Activation(data=x_recon, act_type='relu', name='x_recon_act2')
     x_recon = mx.sym.FullyConnected(data=x_recon, num_hidden=np.prod(input_shape), name='x_recon3')
     x_recon = mx.sym.Activation(data=x_recon, act_type='sigmoid', name='x_recon_act3')
-    print('x_recon',x_recon.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size,)))
 
     data_flatten = mx.sym.flatten(data=data)
     squared_error = mx.sym.square(x_recon-data_flatten)
     recon_error = mx.sym.mean(squared_error)
-    print('squared_error',squared_error.infer_shape(data=(batch_size, 1, 28, 28), softmax_label=(batch_size,)))
     loss = mx.symbol.MakeLoss((1-0.392)*margin_loss(y_onehot, out_caps)+0.392*recon_error)
 
     out_caps_blocked = out_caps

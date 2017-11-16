@@ -1,3 +1,20 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 import mxnet as mx
 
 
@@ -10,27 +27,14 @@ def squash(data, squash_axis, name=''):
 
 
 def PrimaryCaps(data, dim_vector, n_channels, kernel, strides, name=''):
-    """
-    :param data: 4D symbol of shape [batch_size, width, height, channels]
-    :param dim_vector:
-    :param n_channels:
-    :param kernel:
-    :param strides:
-    :param name:
-    :return: 3D tensor of shape [batch_size, num_capsule, dim_vector]
-    """
     out = mx.sym.Convolution(data=data,
                              num_filter=dim_vector * n_channels,
                              kernel=kernel,
                              stride=strides,
                              name=name
                              )
-    # print('after conv2d 2',primarycaps.infer_shape(data=(batch_size, 1, 28, 28)))
-    # net.shape = [batch_size, 1152,8]
     out = mx.sym.Reshape(data=out, shape=(0, -1, dim_vector))
     out = squash(out, squash_axis=2)
-    # primarycaps.infer_shape(data=(batch_size, 1, 28, 28))
-    # print('after squash', primarycaps.infer_shape(data=(batch_size, 1, 28, 28)))
     return out
 
 
@@ -62,43 +66,27 @@ class CapsuleLayer:
                                shape=(self.batch_size, input_num_capsule, self.num_capsule, 1, 1),
                                init=self.bias_initializer)
 
-        # ('input', TensorShape([Dimension(None), Dimension(1152), Dimension(8)]))
-        # ('inputs_expand', TensorShape([Dimension(None), Dimension(1152), Dimension(1), Dimension(8), Dimension(1)]))
+        # input : (batch_size, 1152, 8)
+        # inputs_expand : (batch_size, 1152, 1, 8, 1)
         inputs_expand = mx.sym.Reshape(data=data, shape=(0, 0, -4, -1, 1))
         inputs_expand = mx.sym.Reshape(data=inputs_expand, shape=(0, 0, -4, 1, -1, 0))
-        print('after inputs_expand', inputs_expand.infer_shape(data=(self.batch_size, 1, 28, 28)))
-        # input_tiled
-        # ('inputs_tiled.shape', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(8), Dimension(1)]))
+        # input_tiled (batch_size, 1152, 10, 8, 1)
         inputs_tiled = mx.sym.tile(data=inputs_expand, reps=(1, 1, self.num_capsule, 1, 1))
-        inputs_tiled.infer_shape(data=(self.batch_size, 1, 28, 28))
-        # w_tiled
-        # w_tiled.shape = [(1L, 1152L, 10L, 8L, 16L)]
+        # w_tiled : [(1L, 1152L, 10L, 8L, 16L)]
         w_tiled = mx.sym.tile(w, reps=(self.batch_size, 1, 1, 1, 1))
-        w_tiled.infer_shape()
+
         inputs_hat = mx.sym.linalg_gemm2(w_tiled, inputs_tiled, transpose_a=True)
         inputs_hat = mx.sym.swapaxes(data=inputs_hat, dim1=3, dim2=4)
-        print('inputs_hat', inputs_hat.infer_shape(data=(self.batch_size, 1, 28, 28)))
-        # ('i', 0, 'c', TensorShape([Dimension(1), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
 
         for i in range(0, self.num_routing):
             c = mx.sym.softmax(bias, axis=2, name='c' + str(i))
-            # print('i',i,' c',c.infer_shape())
             outputs = squash(
                 mx.sym.sum(mx.sym.broadcast_mul(c, inputs_hat, name='broadcast_mul_' + str(i)), axis=1, keepdims=True,
                            name='sum_' + str(i)), name='output_' + str(i), squash_axis=4)
-            # print('i', i, ' output', outputs.infer_shape(data=(1, 28, 28)))
             if i != self.num_routing - 1:
                 bias = bias + mx.sym.sum(mx.sym.broadcast_mul(c, inputs_hat, name='bias_broadcast_mul' + str(i)), axis=4,
                                          keepdims=True, name='bias_' + str(i))
 
-        # ('digitcaps', TensorShape([Dimension(None), Dimension(10), Dimension(16)]))
+        # digitcaps : (batch_size, 10, 16)
         outputs = mx.sym.Reshape(data=outputs, shape=(-1, self.num_capsule, self.dim_vector))
-        outputs.infer_shape(data=(self.batch_size, 1, 28, 28))
-        # ('i', 0, 'outputs', TensorShape([Dimension(None), Dimension(1), Dimension(10), Dimension(1), Dimension(16)]))
-        # ('bias', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
-        # ('i', 1, 'c', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
-        # ('i', 1, 'outputs', TensorShape([Dimension(None), Dimension(1), Dimension(10), Dimension(1), Dimension(16)]))
-        # ('bias', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
-        # ('i', 2, 'c', TensorShape([Dimension(None), Dimension(1152), Dimension(10), Dimension(1), Dimension(1)]))
-        # ('i', 2, 'outputs', TensorShape([Dimension(None), Dimension(1), Dimension(10), Dimension(1), Dimension(16)]))
         return outputs
