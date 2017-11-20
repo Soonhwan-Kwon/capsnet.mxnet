@@ -174,7 +174,7 @@ class SimpleLRScheduler(mx.lr_scheduler.LRScheduler):
         return self.learning_rate
 
 
-def do_training(num_epoch, optimizer, kvstore, learning_rate):
+def do_training(num_epoch, optimizer, kvstore, learning_rate, model_prefix):
     lr_scheduler = SimpleLRScheduler(learning_rate)
     optimizer_params = {'lr_scheduler': lr_scheduler}
     module.init_params()
@@ -204,7 +204,7 @@ def do_training(num_epoch, optimizer, kvstore, learning_rate):
         print('Epoch[' + str(n_epoch) + '] val acc:' + str(val_acc) + ' loss:' + str(val_loss))
         print('SAVE CHECKPOINT')
 
-        module.save_checkpoint(prefix='capsnet', epoch=n_epoch)
+        module.save_checkpoint(prefix=model_prefix, epoch=n_epoch)
         n_epoch += 1
         lr_scheduler.learning_rate = learning_rate * (0.9 ** n_epoch)
 
@@ -266,6 +266,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_epoch', default=30, type=int)
     parser.add_argument('--lr', default=0.0001, type=float)
     parser.add_argument('--num_routing', default=3, type=int)
+    parser.add_argument('--model_prefix', default='capsnet', type=str)
     args = parser.parse_args()
     contexts = re.split(r'\W+', args.devices)
     for i, ctx in enumerate(contexts):
@@ -293,4 +294,5 @@ if __name__ == "__main__":
     module.bind(data_shapes=train_iter.provide_data,
                 label_shapes=val_iter.provide_label,
                 for_training=True)
-    do_training(num_epoch=args.num_epoch, optimizer='adam', kvstore='device', learning_rate=args.lr)
+    do_training(num_epoch=args.num_epoch, optimizer='adam', kvstore='device', learning_rate=args.lr,
+                model_prefix=args.model_prefix)
