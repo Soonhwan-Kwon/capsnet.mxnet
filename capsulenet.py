@@ -200,8 +200,8 @@ def do_training(num_epoch, optimizer, kvstore, learning_rate, model_prefix):
             module.update_metric(loss_metric, data_batch.label)
             loss_metric.get_batch_log(n_batch)
         val_acc, val_loss = loss_metric.get_name_value()
-        print('Epoch[' + str(n_epoch) + '] train acc:' + str(train_acc) + ' loss:' + str(train_loss))
-        print('Epoch[' + str(n_epoch) + '] val acc:' + str(val_acc) + ' loss:' + str(val_loss))
+        print('Epoch[%d] train acc: %.4f loss: %.6f' % (n_epoch, train_acc, train_loss))
+        print('Epoch[%d] train acc: %.4f loss: %.6f' % (n_epoch, val_acc, val_loss))
         print('SAVE CHECKPOINT')
 
         module.save_checkpoint(prefix=model_prefix, epoch=n_epoch)
@@ -261,10 +261,10 @@ if __name__ == "__main__":
     # set batch size
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_size', default=10, type=int)
+    parser.add_argument('--batch_size', default=100, type=int)
     parser.add_argument('--devices', default='gpu0', type=str)
-    parser.add_argument('--num_epoch', default=50, type=int)
-    parser.add_argument('--lr', default=0.0001, type=float)
+    parser.add_argument('--num_epoch', default=100, type=int)
+    parser.add_argument('--lr', default=0.001, type=float)
     parser.add_argument('--num_routing', default=3, type=int)
     parser.add_argument('--model_prefix', default='capsnet', type=str)
     args = parser.parse_args()
