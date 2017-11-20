@@ -201,7 +201,7 @@ def do_training(num_epoch, optimizer, kvstore, learning_rate, model_prefix):
             loss_metric.get_batch_log(n_batch)
         val_acc, val_loss = loss_metric.get_name_value()
         print('Epoch[%d] train acc: %.4f loss: %.6f' % (n_epoch, train_acc, train_loss))
-        print('Epoch[%d] train acc: %.4f loss: %.6f' % (n_epoch, val_acc, val_loss))
+        print('Epoch[%d] val acc: %.4f loss: %.6f' % (n_epoch, val_acc, val_loss))
         print('SAVE CHECKPOINT')
 
         module.save_checkpoint(prefix=model_prefix, epoch=n_epoch)
