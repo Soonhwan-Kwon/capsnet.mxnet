@@ -24,7 +24,8 @@ MXNet version above (0.11.0)
 
 ***
 ## **Results**  
-CapsNet classification test error on MNIST
+CapsNet classification test error on MNIST  
+Train time takes about 36 seconds for each epoch (batch_size=100, lr=0.001, 2 gtx 1080 gpus)
 
 | Epoch | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
