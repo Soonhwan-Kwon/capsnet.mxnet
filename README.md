@@ -16,6 +16,10 @@ On Multi gpus
 ```
 python capsulenet.py --devices gpu0,gpu1
 ```
+Full arguments  
+```
+python capsulenet.py --batch_size 100 --devices gpu0,gpu1 --num_epoch 100 --lr 0.001 --num_routing 3 --model_prefix capsnet
+```  
 
 * * *
 ## **Prerequisities**
