@@ -263,7 +263,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', default=10, type=int)
     parser.add_argument('--devices', default='gpu0', type=str)
-    parser.add_argument('--num_epoch', default=30, type=int)
+    parser.add_argument('--num_epoch', default=50, type=int)
     parser.add_argument('--lr', default=0.0001, type=float)
     parser.add_argument('--num_routing', default=3, type=int)
     parser.add_argument('--model_prefix', default='capsnet', type=str)
