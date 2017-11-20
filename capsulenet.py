@@ -22,36 +22,37 @@ import re
 import urllib
 import gzip
 import struct
-from capsulelayers import PrimaryCaps, CapsuleLayer
+import scipy.ndimage as ndi
+from capsulelayers import primary_caps, CapsuleLayer
 
 
 def margin_loss(y_true, y_pred):
-    L = y_true * mx.sym.square(mx.sym.maximum(0., 0.9 - y_pred)) +\
+    loss = y_true * mx.sym.square(mx.sym.maximum(0., 0.9 - y_pred)) +\
         0.5 * (1 - y_true) * mx.sym.square(mx.sym.maximum(0., y_pred - 0.1))
-    return mx.sym.mean(data=mx.sym.sum(L, 1))
+    return mx.sym.mean(data=mx.sym.sum(loss, 1))
 
 
 def capsnet(batch_size, n_class, num_routing):
     # data.shape = [batch_size, 1, 28, 28]
     data = mx.sym.Variable('data')
 
-    input_shape =(1, 28, 28)
-    #Conv2D layer
+    input_shape = (1, 28, 28)
+    # Conv2D layer
     # net.shape = [batch_size, 256, 20, 20]
     conv1 = mx.sym.Convolution(data=data,
                                num_filter=256,
-                               kernel=(9,9),
+                               kernel=(9, 9),
                                layout='NCHW',
                                name='conv1')
     conv1 = mx.sym.Activation(data=conv1, act_type='relu', name='conv1_act')
     # net.shape = [batch_size, 256, 6, 6]
 
-    primarycaps = PrimaryCaps(data=conv1,
-                              dim_vector=8,
-                              n_channels=32,
-                              kernel=(9, 9),
-                              strides=[2,2],
-                              name='primarycaps')
+    primarycaps = primary_caps(data=conv1,
+                               dim_vector=8,
+                               n_channels=32,
+                               kernel=(9, 9),
+                               strides=[2, 2],
+                               name='primarycaps')
     primarycaps.infer_shape(data=(batch_size, 1, 28, 28))
     # CapsuleLayer
     kernel_initializer = mx.init.Xavier(rnd_type='uniform', factor_type='avg', magnitude=3)
@@ -106,7 +107,7 @@ def read_data(label_url, image_url):
     with gzip.open(download_data(image_url), 'rb') as fimg:
         magic, num, rows, cols = struct.unpack(">IIII", fimg.read(16))
         image = np.fromstring(fimg.read(), dtype=np.uint8).reshape(len(label), rows, cols)
-    return (label, image)
+    return label, image
 
 
 def to4d(img):
@@ -207,6 +208,49 @@ def do_training(num_epoch, optimizer, kvstore, learning_rate):
         n_epoch += 1
         lr_scheduler.learning_rate = learning_rate * (0.9 ** n_epoch)
 
+
+def apply_transform(x,
+                    transform_matrix,
+                    fill_mode='nearest',
+                    cval=0.):
+    x = np.rollaxis(x, 0, 0)
+    final_affine_matrix = transform_matrix[:2, :2]
+    final_offset = transform_matrix[:2, 2]
+    channel_images = [ndi.interpolation.affine_transform(
+        x_channel,
+        final_affine_matrix,
+        final_offset,
+        order=0,
+        mode=fill_mode,
+        cval=cval) for x_channel in x]
+    x = np.stack(channel_images, axis=0)
+    x = np.rollaxis(x, 0, 0 + 1)
+    return x
+
+
+def random_shift(x, width_shift_fraction, height_shift_fraction):
+    tx = np.random.uniform(-height_shift_fraction, height_shift_fraction) * x.shape[2]
+    ty = np.random.uniform(-width_shift_fraction, width_shift_fraction) * x.shape[1]
+    shift_matrix = np.array([[1, 0, tx],
+                             [0, 1, ty],
+                             [0, 0, 1]])
+    x = apply_transform(x, shift_matrix, 'nearest')
+    return x
+
+
+class MNISTCustomIter(mx.io.NDArrayIter):
+    def next(self):
+        if self.iter_next():
+            data_raw_list = self.getdata()
+            data_shifted = []
+            for data_raw in data_raw_list[0]:
+                data_shifted.append(random_shift(data_raw.asnumpy(), 0.1, 0.1))
+            return mx.io.DataBatch(data=[mx.nd.array(data_shifted)], label=self.getlabel(),
+                                   pad=self.getpad(), index=None)
+        else:
+            raise StopIteration
+
+
 if __name__ == "__main__":
     # Read mnist data set
     path = 'http://yann.lecun.com/exdb/mnist/'
@@ -234,10 +278,9 @@ if __name__ == "__main__":
     if args.batch_size % num_gpu != 0:
         raise Exception('num_gpu should be positive divisor of batch_size')
 
-
     # generate train_iter, val_iter
-    train_iter = mx.io.NDArrayIter(data=to4d(train_img), label=train_lbl, batch_size=args.batch_size, shuffle=True)
-    val_iter = mx.io.NDArrayIter(data=to4d(val_img), label=val_lbl, batch_size=args.batch_size,)
+    train_iter = MNISTCustomIter(data=to4d(train_img), label=train_lbl, batch_size=args.batch_size, shuffle=True)
+    val_iter = MNISTCustomIter(data=to4d(val_img), label=val_lbl, batch_size=args.batch_size,)
 
     # define capsnet
     final_net = capsnet(batch_size=args.batch_size/num_gpu, n_class=10, num_routing=args.num_routing)
@@ -251,5 +294,3 @@ if __name__ == "__main__":
                 label_shapes=val_iter.provide_label,
                 for_training=True)
     do_training(num_epoch=args.num_epoch, optimizer='adam', kvstore='device', learning_rate=args.lr)
-
-
