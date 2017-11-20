@@ -8,6 +8,11 @@ Sara Sabour, Nicholas Frosst, Geoffrey E Hinton. Dynamic Routing Between Capsule
 Due to the permission issue, this example is maintained in this [repository](https://github.com/samsungsds-rnd/capsnet.mxnet) separately.
 * * *
 ## **Usage**
+Install scipy with pip  
+```
+pip install scipy
+```
+
 On Single gpu
 ```
 python capsulenet.py --devices gpu0
@@ -24,9 +29,10 @@ MXNet version above (0.11.0)
 
 ***
 ## **Results**  
-CapsNet classification test error on MNIST  
-Train time takes about 36 seconds for each epoch (batch_size=100, lr=0.001, 2 gtx 1080 gpus)
+Train time takes about 36 seconds for each epoch (batch_size=100, lr=0.001, 2 gtx 1080 gpus)  
+and we limited number of epoch to 100 as default to limit our training time(1 hour).
 
+CapsNet classification test error on MNIST  
 | Epoch | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Train | 0.9281 | 0.9868 | 0.9912 | 0.9932 | 0.9947 | 0.9957 | 0.9965 | 0.9971 | 0.9976 | 0.9980 | 0.9981 | 0.9984 | 0.9986 | 0.9987 | 0.9988 | 0.9989 | 0.9989 |
