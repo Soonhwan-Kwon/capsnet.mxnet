@@ -34,5 +34,7 @@ Train time takes about 36 seconds for each epoch (batch_size=100, lr=0.001, 2 gt
 and we limited number of epoch to 100 as default to limit our training time(1 hour).
 
 CapsNet classification test error on MNIST  
-At Epoch 40,  
-train error is 0.23% test error is 0.44%  
+
+| Epoch | train err | test err | train loss | test loss |
+| :---: | :---: | :---: | :---: | :---: |
+| 40 | 0.23 | 0.44 | 0.00020097 | 0.00022076 |
