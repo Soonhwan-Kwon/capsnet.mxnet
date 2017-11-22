@@ -37,7 +37,7 @@ and we limited number of epoch to 100 as default to limit our training time(1 ho
 CapsNet classification test error on MNIST  
 
 ```
-python capsulenet.py --devices gpu0,gpu1 --lr 0.0005 --decay 0.99 --model_prefix lr_0_0005_decay_0_99 --batch_size 100 --num_routing 3
+python capsulenet.py --devices gpu0,gpu1 --lr 0.0005 --decay 0.99 --model_prefix lr_0_0005_decay_0_99 --batch_size 100 --num_routing 3 --num_epoch 200
 ```
 
 | Epoch | train err | test err | train loss | test loss |
