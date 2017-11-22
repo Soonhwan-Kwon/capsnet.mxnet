@@ -25,7 +25,6 @@ import struct
 import scipy.ndimage as ndi
 from capsulelayers import primary_caps, CapsuleLayer
 
-
 def margin_loss(y_true, y_pred):
     loss = y_true * mx.sym.square(mx.sym.maximum(0., 0.9 - y_pred)) +\
         0.5 * (1 - y_true) * mx.sym.square(mx.sym.maximum(0., y_pred - 0.1))
@@ -237,16 +236,42 @@ def random_shift(x, width_shift_fraction, height_shift_fraction):
     x = apply_transform(x, shift_matrix, 'nearest')
     return x
 
+def _shuffle(data, idx):
+    """Shuffle the data."""
+    shuffle_data = []
+
+    for k, v in data:
+        shuffle_data.append((k, mx.ndarray.array(v.asnumpy()[idx], v.context)))
+
+    return shuffle_data
 
 class MNISTCustomIter(mx.io.NDArrayIter):
+    
+    def reset(self):
+        # shuffle data
+        if self.is_train:
+            np.random.shuffle(self.idx)
+            self.data = _shuffle(self.data, self.idx)
+            self.label = _shuffle(self.label, self.idx)
+        if self.last_batch_handle == 'roll_over' and self.cursor > self.num_data:
+            self.cursor = -self.batch_size + (self.cursor%self.num_data)%self.batch_size
+        else:
+            self.cursor = -self.batch_size
+    def set_is_train(self, is_train):
+        self.is_train = is_train
     def next(self):
         if self.iter_next():
-            data_raw_list = self.getdata()
-            data_shifted = []
-            for data_raw in data_raw_list[0]:
-                data_shifted.append(random_shift(data_raw.asnumpy(), 0.1, 0.1))
-            return mx.io.DataBatch(data=[mx.nd.array(data_shifted)], label=self.getlabel(),
-                                   pad=self.getpad(), index=None)
+            if self.is_train:
+                data_raw_list = self.getdata()
+                data_shifted = []
+                for data_raw in data_raw_list[0]:
+                    data_shifted.append(random_shift(data_raw.asnumpy(), 0.1, 0.1))
+                return mx.io.DataBatch(data=[mx.nd.array(data_shifted)], label=self.getlabel(),
+                                       pad=self.getpad(), index=None)
+            else:
+                 return mx.io.DataBatch(data=self.getdata(), label=self.getlabel(), \
+                                  pad=self.getpad(), index=None)
+
         else:
             raise StopIteration
 
@@ -269,6 +294,8 @@ if __name__ == "__main__":
     parser.add_argument('--model_prefix', default='capsnet', type=str)
     parser.add_argument('--decay', default=0.9, type=float)
     args = parser.parse_args()
+    for k, v in sorted(vars(args).items()):
+        print("{0}: {1}".format(k, v))
     contexts = re.split(r'\W+', args.devices)
     for i, ctx in enumerate(contexts):
         if ctx[:3] == 'gpu':
@@ -282,8 +309,9 @@ if __name__ == "__main__":
 
     # generate train_iter, val_iter
     train_iter = MNISTCustomIter(data=to4d(train_img), label=train_lbl, batch_size=args.batch_size, shuffle=True)
+    train_iter.set_is_train(True)
     val_iter = MNISTCustomIter(data=to4d(val_img), label=val_lbl, batch_size=args.batch_size,)
-
+    val_iter.set_is_train(False)
     # define capsnet
     final_net = capsnet(batch_size=args.batch_size/num_gpu, n_class=10, num_routing=args.num_routing)
 
