@@ -26,7 +26,7 @@ python capsulenet.py --devices gpu0,gpu1
 * * *
 ## **Prerequisities**
 
-MXNet version above (0.11.0)
+MXNet version above (0.11.0)  
 scipy version above (0.19.0)
 
 ***
