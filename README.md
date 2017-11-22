@@ -32,7 +32,6 @@ scipy version above (0.19.0)
 ***
 ## **Results**  
 Train time takes about 36 seconds for each epoch (batch_size=100, lr=0.001, 2 gtx 1080 gpus)  
-and we limited number of epoch to 100 as default to limit our training time(1 hour).
 
 CapsNet classification test error on MNIST  
 
