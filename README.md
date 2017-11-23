@@ -3,9 +3,10 @@
 
 This example is MXNet implementation of [CapsNet](https://arxiv.org/abs/1710.09829):  
 Sara Sabour, Nicholas Frosst, Geoffrey E Hinton. Dynamic Routing Between Capsules. NIPS 2017
-- The Current best test error is 0.44%  
+- The current `best test error is 0.29%` and `average test error is 0.303%`
+- The `average test error on paper is 0.25%`  
 
-Due to the permission issue, this example is maintained in this [repository](https://github.com/samsungsds-rnd/capsnet.mxnet) separately.
+Log files for the error rate are uploaded in [repository](https://github.com/samsungsds-rnd/capsnet.mxnet).  
 * * *
 ## **Usage**
 Install scipy with pip  
@@ -29,16 +30,24 @@ python capsulenet.py --batch_size 100 --devices gpu0,gpu1 --num_epoch 100 --lr 0
 * * *
 ## **Prerequisities**
 
-MXNet version above (0.11.0)
+MXNet version above (0.11.0)  
 scipy version above (0.19.0)
 
 ***
 ## **Results**  
-Train time takes about 36 seconds for each epoch (batch_size=100, lr=0.001, 2 gtx 1080 gpus)  
-and we limited number of epoch to 100 as default to limit our training time(1 hour).
+Train time takes about 36 seconds for each epoch (batch_size=100, 2 gtx 1080 gpus)  
 
 CapsNet classification test error on MNIST  
 
-| Epoch | train err | test err | train loss | test loss |
-| :---: | :---: | :---: | :---: | :---: |
-| 40 | 0.23 | 0.44 | 0.00020097 | 0.00022076 |
+```
+python capsulenet.py --devices gpu0,gpu1 --lr 0.0005 --decay 0.99 --model_prefix lr_0_0005_decay_0_99 --batch_size 100 --num_routing 3 --num_epoch 200
+```
+
+![](result.PNG)
+
+| Trial | Epoch | train err(%) | test err(%) | train loss | test loss |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | 120 | 0.06 | 0.31 | 0.000056 | 0.000064 |
+| 2 | 167 | 0.03 | 0.29 | 0.000048 | 0.000058 |
+| 3 | 182 | 0.04 | 0.31 | 0.000046 | 0.000058 |
+| average | - | 0.043 | 0.303 | 0.00005 | 0.00006 |
