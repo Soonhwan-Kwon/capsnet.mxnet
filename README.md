@@ -39,7 +39,7 @@ CapsNet classification test error on MNIST
 python capsulenet.py --devices gpu0,gpu1 --lr 0.0005 --decay 0.99 --model_prefix lr_0_0005_decay_0_99 --batch_size 100 --num_routing 3 --num_epoch 200
 ```
 
-| Trial | Epoch | train err | test err | train loss | test loss |
+| Trial | Epoch | train err(%) | test err(%) | train loss | test loss |
 | :---: | :---: | :---: | :---: | :---: | :---: |
 | 1 | 120 | 0.06 | 0.31 | 0.000056 | 0.000064 |
 | 2 | 167 | 0.03 | 0.29 | 0.000048 | 0.000058 |
