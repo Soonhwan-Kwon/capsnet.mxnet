@@ -14,7 +14,6 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
 import mxnet as mx
 import numpy as np
 import os
@@ -24,6 +23,8 @@ import gzip
 import struct
 import scipy.ndimage as ndi
 from capsulelayers import primary_caps, CapsuleLayer
+
+from tensorboard import SummaryWriter
 
 def margin_loss(y_true, y_pred):
     loss = y_true * mx.sym.square(mx.sym.maximum(0., 0.9 - y_pred)) +\
@@ -174,6 +175,7 @@ class SimpleLRScheduler(mx.lr_scheduler.LRScheduler):
 
 
 def do_training(num_epoch, optimizer, kvstore, learning_rate, model_prefix, decay):
+    summary_writer = SummaryWriter(args.tblog_dir)
     lr_scheduler = SimpleLRScheduler(learning_rate)
     optimizer_params = {'lr_scheduler': lr_scheduler}
     module.init_params()
@@ -199,6 +201,12 @@ def do_training(num_epoch, optimizer, kvstore, learning_rate, model_prefix, deca
             module.update_metric(loss_metric, data_batch.label)
             loss_metric.get_batch_log(n_batch)
         val_acc, val_loss = loss_metric.get_name_value()
+
+        summary_writer.add_scalar('train_acc', train_acc, n_epoch)
+        summary_writer.add_scalar('train_loss', train_loss, n_epoch)
+        summary_writer.add_scalar('val_acc', val_acc, n_epoch)
+        summary_writer.add_scalar('val_loss', val_loss, n_epoch)
+
         print('Epoch[%d] train acc: %.4f loss: %.6f' % (n_epoch, train_acc, train_loss))
         print('Epoch[%d] val acc: %.4f loss: %.6f' % (n_epoch, val_acc, val_loss))
         print('SAVE CHECKPOINT')
@@ -293,6 +301,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_routing', default=3, type=int)
     parser.add_argument('--model_prefix', default='capsnet', type=str)
     parser.add_argument('--decay', default=0.9, type=float)
+    parser.add_argument('--tblog_dir', default='tblog', type=str)
     args = parser.parse_args()
     for k, v in sorted(vars(args).items()):
         print("{0}: {1}".format(k, v))
@@ -314,7 +323,6 @@ if __name__ == "__main__":
     val_iter.set_is_train(False)
     # define capsnet
     final_net = capsnet(batch_size=args.batch_size/num_gpu, n_class=10, num_routing=args.num_routing)
-
     # set metric
     loss_metric = LossMetric(args.batch_size/num_gpu, 1)
 
