@@ -32,7 +32,7 @@ def margin_loss(y_true, y_pred):
     return mx.sym.mean(data=mx.sym.sum(loss, 1))
 
 
-def capsnet(batch_size, n_class, num_routing):
+def capsnet(batch_size, n_class, num_routing,recon_loss_weight):
     # data.shape = [batch_size, 1, 28, 28]
     data = mx.sym.Variable('data')
 
@@ -86,11 +86,13 @@ def capsnet(batch_size, n_class, num_routing):
     data_flatten = mx.sym.flatten(data=data)
     squared_error = mx.sym.square(x_recon-data_flatten)
     recon_error = mx.sym.mean(squared_error)
-    loss = mx.symbol.MakeLoss((1-0.392)*margin_loss(y_onehot, out_caps)+0.392*recon_error)
+    recon_error_stopped = recon_error
+    recon_error_stopped = mx.sym.BlockGrad(recon_error_stopped)
+    loss = mx.symbol.MakeLoss((1-recon_loss_weight)*margin_loss(y_onehot, out_caps)+recon_loss_weight*recon_error)
 
     out_caps_blocked = out_caps
     out_caps_blocked = mx.sym.BlockGrad(out_caps_blocked)
-    return mx.sym.Group([out_caps_blocked, loss])
+    return mx.sym.Group([out_caps_blocked, loss, recon_error_stopped])
 
 
 def download_data(url, force_download=False):
@@ -125,6 +127,8 @@ class LossMetric(mx.metric.EvalMetric):
         self.batch_sum_metric = 0
         self.batch_num_inst = 0
         self.batch_loss = 0.0
+        self.recon_loss = 0.0
+        self.n_batch = 0
 
     def update(self, labels, preds):
         batch_sum_metric = 0
@@ -135,17 +139,21 @@ class LossMetric(mx.metric.EvalMetric):
             batch_sum_metric += int(label_np == pred_label)
             batch_num_inst += 1
         batch_loss = preds[1].asnumpy()
+        recon_loss = preds[2].asnumpy()
         self.sum_metric += batch_sum_metric
         self.num_inst += batch_num_inst
         self.loss += batch_loss
+        self.recon_loss += recon_loss
         self.batch_sum_metric = batch_sum_metric
         self.batch_num_inst = batch_num_inst
         self.batch_loss = batch_loss
+        self.n_batch += 1 
 
     def get_name_value(self):
         acc = float(self.sum_metric)/float(self.num_inst)
-        mean_loss = self.loss / float(self.num_inst)
-        return acc, mean_loss
+        mean_loss = self.loss / float(self.n_batch)
+        mean_recon_loss = self.recon_loss / float(self.n_batch)
+        return acc, mean_loss, mean_recon_loss
 
     def get_batch_log(self, n_batch):
         print("n_batch :"+str(n_batch)+" batch_acc:" +
@@ -159,6 +167,8 @@ class LossMetric(mx.metric.EvalMetric):
         self.sum_metric = 0
         self.num_inst = 0
         self.loss = 0.0
+        self.recon_loss = 0.0
+        self.n_batch = 0
 
 
 class SimpleLRScheduler(mx.lr_scheduler.LRScheduler):
@@ -194,21 +204,23 @@ def do_training(num_epoch, optimizer, kvstore, learning_rate, model_prefix, deca
             module.update()
             module.update_metric(loss_metric, data_batch.label)
             loss_metric.get_batch_log(n_batch)
-        train_acc, train_loss = loss_metric.get_name_value()
+        train_acc, train_loss, train_recon_err = loss_metric.get_name_value()
         loss_metric.reset()
         for n_batch, data_batch in enumerate(val_iter):
             module.forward(data_batch)
             module.update_metric(loss_metric, data_batch.label)
             loss_metric.get_batch_log(n_batch)
-        val_acc, val_loss = loss_metric.get_name_value()
+        val_acc, val_loss, val_recon_err = loss_metric.get_name_value()
 
         summary_writer.add_scalar('train_acc', train_acc, n_epoch)
         summary_writer.add_scalar('train_loss', train_loss, n_epoch)
+        summary_writer.add_scalar('train_recon_err', train_recon_err, n_epoch)
         summary_writer.add_scalar('val_acc', val_acc, n_epoch)
         summary_writer.add_scalar('val_loss', val_loss, n_epoch)
+        summary_writer.add_scalar('val_recon_err', val_recon_err, n_epoch)
 
-        print('Epoch[%d] train acc: %.4f loss: %.6f' % (n_epoch, train_acc, train_loss))
-        print('Epoch[%d] val acc: %.4f loss: %.6f' % (n_epoch, val_acc, val_loss))
+        print('Epoch[%d] train acc: %.4f loss: %.6f recon_err: %.6f' % (n_epoch, train_acc, train_loss, train_recon_err))
+        print('Epoch[%d] val acc: %.4f loss: %.6f recon_err: %.6f' % (n_epoch, val_acc, val_loss, val_recon_err))
         print('SAVE CHECKPOINT')
 
         module.save_checkpoint(prefix=model_prefix, epoch=n_epoch)
@@ -302,6 +314,7 @@ if __name__ == "__main__":
     parser.add_argument('--model_prefix', default='capsnet', type=str)
     parser.add_argument('--decay', default=0.9, type=float)
     parser.add_argument('--tblog_dir', default='tblog', type=str)
+    parser.add_argument('--recon_loss_weight', default=0.392, type=float)
     args = parser.parse_args()
     for k, v in sorted(vars(args).items()):
         print("{0}: {1}".format(k, v))
@@ -322,7 +335,7 @@ if __name__ == "__main__":
     val_iter = MNISTCustomIter(data=to4d(val_img), label=val_lbl, batch_size=args.batch_size,)
     val_iter.set_is_train(False)
     # define capsnet
-    final_net = capsnet(batch_size=args.batch_size/num_gpu, n_class=10, num_routing=args.num_routing)
+    final_net = capsnet(batch_size=args.batch_size/num_gpu, n_class=10, num_routing=args.num_routing, recon_loss_weight=args.recon_loss_weight)
     # set metric
     loss_metric = LossMetric(args.batch_size/num_gpu, 1)
 
